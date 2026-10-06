@@ -1,0 +1,105 @@
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { requireAuth } from "../middleware/auth.js";
+import { OAuth2Client } from "google-auth-library";
+
+const router = express.Router();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+function signToken(user) {
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
+}
+
+function publicUser(user) {
+  return {
+    id: user._id, username: user.username, name: user.name,
+    role: user.role, teamId: user.teamId || null,
+    notifications: user.notifications,
+  };
+}
+
+// Public signup — only citizen or volunteer accounts can self-register.
+// Admin and response-team accounts are seeded, not created here.
+router.post("/signup", async (req, res) => {
+  const { name, username, password, role, phone } = req.body;
+  if (!name || !username || !password) return res.status(400).json({ error: "All fields are required." });
+  if (!["citizen", "volunteer"].includes(role)) {
+    return res.status(400).json({ error: "Self-signup is only available for citizen or volunteer accounts." });
+  }
+  const existing = await User.findOne({ username: username.toLowerCase() });
+  if (existing) return res.status(409).json({ error: "That username is already taken." });
+
+  const hash = await bcrypt.hash(password, 10);
+  const user = await User.create({ name, username: username.toLowerCase(), password: hash, role, phone });
+  res.status(201).json({ token: signToken(user), user: publicUser(user) });
+});
+
+router.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+  const user = await User.findOne({ username: (username || "").toLowerCase() });
+  if (!user) return res.status(401).json({ error: "Invalid username or password." });
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return res.status(401).json({ error: "Invalid username or password." });
+  res.json({ token: signToken(user), user: publicUser(user) });
+});
+
+router.get("/me", requireAuth, async (req, res) => {
+  res.json({ user: publicUser(req.user) });
+});
+
+router.patch("/notifications/read", requireAuth, async (req, res) => {
+  req.user.notifications.forEach(n => { n.read = true; });
+  await req.user.save();
+  res.json({ user: publicUser(req.user) });
+});
+
+// Google OAuth
+router.post("/google", async (req, res) => {
+  try {
+    const { token } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    let user = await User.findOne({ username: payload.email });
+    
+    if (!user) {
+      const hash = await bcrypt.hash("random_google_password_" + Date.now(), 10);
+      user = await User.create({
+        name: payload.name,
+        username: payload.email,
+        password: hash,
+        role: "citizen"
+      });
+    }
+    res.json({ token: signToken(user), user: publicUser(user) });
+  } catch (err) {
+    res.status(401).json({ error: "Google Auth Failed" });
+  }
+});
+
+// Seed 5 Users
+router.get("/setup-users", async (req, res) => {
+  try {
+    const hash = await bcrypt.hash("password123", 10);
+    const users = [
+      { name: "John Doe", username: "user1@test.com", password: hash, role: "citizen" },
+      { name: "Jane Smith", username: "user2@test.com", password: hash, role: "volunteer" },
+      { name: "Mike Johnson", username: "user3@test.com", password: hash, role: "citizen" },
+      { name: "Sara Connor", username: "user4@test.com", password: hash, role: "volunteer" },
+      { name: "Admin Test", username: "admin_test@test.com", password: hash, role: "admin" }
+    ];
+    for (const u of users) {
+      const exists = await User.findOne({ username: u.username });
+      if (!exists) await User.create(u);
+    }
+    res.json({ message: "5 users created successfully!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;
