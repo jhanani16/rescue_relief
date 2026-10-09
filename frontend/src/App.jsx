@@ -301,7 +301,7 @@ export default function App() {
     return (
       <div style={S.app}>
         <style>{CSS}</style>
-        <AuthScreen onLogin={login} onSignup={signup} error={authError} clearError={() => setAuthError("")} />
+        <LandingPage onLogin={login} onSignup={signup} error={authError} clearError={() => setAuthError("")} />
       </div>
     );
   }
@@ -322,19 +322,8 @@ export default function App() {
         </div>
         
         {/* Theme and Language Controls */}
-        <div style={{ display: 'flex', gap: '8px', marginLeft: '20px' }}>
-          <select style={{ ...S.input, padding: '4px 8px', fontSize: 11 }} onChange={(e) => document.documentElement.setAttribute('data-theme', e.target.value)}>
-            <option value="dark">Dark Theme</option>
-            <option value="light">Light Theme</option>
-            <option value="darkblue">Dark Blue Theme</option>
-          </select>
-          <select style={{ ...S.input, padding: '4px 8px', fontSize: 11 }} onChange={(e) => {
-            document.cookie = `googtrans=/en/${e.target.value}`;
-            window.location.reload();
-          }}>
-            <option value="en">English</option>
-            <option value="ta">Tamil (தமிழ்)</option>
-          </select>
+        <div style={{ marginLeft: 20 }}>
+          <GlobalSettings />
         </div>
 
         <div style={S.spacer} />
@@ -406,9 +395,42 @@ export default function App() {
   );
 }
 
-/* ---------------- Auth ---------------- */
+function toneColor(tone) { return { critical: "#D64545", warn: "#E8A23D", success: "#3FA873", info: "#5B7290" }[tone] || "#5B7290"; }
 
-function AuthScreen({ onLogin, onSignup, error, clearError }) {
+function GlobalSettings() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#111E30', padding: '8px 16px', borderRadius: 8, border: '1px solid #1D2A3D' }}>
+      <select style={{ ...S.input, padding: '4px 8px', fontSize: 11 }} onChange={(e) => document.documentElement.setAttribute('data-theme', e.target.value)}>
+        <option value="dark">Dark Theme</option>
+        <option value="light">Light Theme</option>
+        <option value="darkblue">Dark Blue Theme</option>
+      </select>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8496AE', fontSize: 11 }}>
+        Text Color: 
+        <input type="color" defaultValue="#E7ECF3" onChange={(e) => document.documentElement.style.setProperty('--text-color', e.target.value)} style={{ padding: 0, border: 'none', background: 'none', width: 20, height: 20, cursor: 'pointer' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8496AE', fontSize: 11 }}>
+        Btn Color: 
+        <input type="color" defaultValue="#3FA873" onChange={(e) => document.documentElement.style.setProperty('--btn-color', e.target.value)} style={{ padding: 0, border: 'none', background: 'none', width: 20, height: 20, cursor: 'pointer' }} />
+      </div>
+      <select style={{ ...S.input, padding: '4px 8px', fontSize: 11 }} onChange={(e) => {
+        document.cookie = `googtrans=/en/${e.target.value}`;
+        window.location.reload();
+      }}>
+        <option value="en">English</option>
+        <option value="hi">Hindi (हिन्दी)</option>
+        <option value="bn">Bengali (বাংলা)</option>
+        <option value="te">Telugu (తెలుగు)</option>
+        <option value="mr">Marathi (मराठी)</option>
+        <option value="ta">Tamil (தமிழ்)</option>
+        <option value="gu">Gujarati (ગુજરાતી)</option>
+      </select>
+    </div>
+  );
+}
+
+function LandingPage({ onLogin, onSignup, error, clearError }) {
+  const [showAuth, setShowAuth] = useState(false);
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -416,12 +438,22 @@ function AuthScreen({ onLogin, onSignup, error, clearError }) {
   const [signupRole, setSignupRole] = useState("citizen");
   const [phone, setPhone] = useState("");
 
+  const [stats, setStats] = useState(null);
+  const [liveUpdates, setLiveUpdates] = useState([]);
+
   const submitLogin = (e) => { e.preventDefault(); onLogin(username, password); };
   const submitSignup = (e) => { e.preventDefault(); onSignup({ name, username, password, role: signupRole, phone }); };
   const switchMode = (m) => { setMode(m); clearError(); setUsername(""); setPassword(""); setName(""); setPhone(""); };
 
   useEffect(() => {
-    if (mode === "login" && window.google) {
+    api.get("/public/stats").then(res => setStats(res.data)).catch(()=>{});
+    const socket = createSocket(null);
+    socket.on("log", (l) => setLiveUpdates(prev => [l, ...prev].slice(0, 20)));
+    return () => socket.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (showAuth && mode === "login" && window.google) {
       window.google.accounts.id.initialize({
         client_id: "336658980922-tlhiqp8i93fvkshjqbn3evipsafhapoe.apps.googleusercontent.com",
         callback: async (response) => {
@@ -439,66 +471,117 @@ function AuthScreen({ onLogin, onSignup, error, clearError }) {
         { theme: "outline", size: "large", type: "standard", width: "100%" }
       );
     }
-  }, [mode]);
+  }, [showAuth, mode]);
 
   return (
-    <div style={S.authWrap}>
-      <div style={S.authCard}>
-        <div style={S.authBrand}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#0B1420' }}>
+      {/* Top Navbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 30px', background: '#0F1B2E', borderBottom: '1px solid #1D2A3D' }}>
+        <div style={S.brand}>
           <div style={S.brandMark}><Zap size={18} color="#0F1B2E" /></div>
           <div>
             <div style={{ ...S.brandName, fontSize: 19 }}>RescueRelief</div>
             <div style={S.brandSub}>Emergency Response Coordination</div>
           </div>
         </div>
-        <div style={S.authTabs}>
-          <button style={{ ...S.authTab, ...(mode === "login" ? S.authTabActive : {}) }} onClick={() => switchMode("login")}>Log in</button>
-          <button style={{ ...S.authTab, ...(mode === "signup" ? S.authTabActive : {}) }} onClick={() => switchMode("signup")}>Sign up</button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <GlobalSettings />
+          {!showAuth && (
+            <button style={S.primaryBtn} onClick={() => setShowAuth(true)}>Login / Register</button>
+          )}
         </div>
-        {mode === "login" ? (
-          <form onSubmit={submitLogin} style={S.form}>
-            <div id="google-signin-btn" style={{ marginBottom: 12 }}></div>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#8496AE", marginBottom: 12 }}>OR</div>
-            <label style={S.label}>Username</label>
-            <div style={S.inputIcon}><UserIcon size={14} /><input style={S.inputBare} value={username} onChange={e => setUsername(e.target.value)} required /></div>
-            <label style={S.label}>Password</label>
-            <div style={S.inputIcon}><Lock size={14} /><input style={S.inputBare} type="password" value={password} onChange={e => setPassword(e.target.value)} required /></div>
-            {error && <div style={S.authError}>{error}</div>}
-            <button type="submit" style={S.primaryBtn}>Log in</button>
-          </form>
+      </div>
+
+      <div style={{ flex: 1, padding: '40px', display: 'flex', justifyContent: 'center' }}>
+        {showAuth ? (
+          <div style={{ width: '100%', maxWidth: 420 }}>
+            <button style={{...S.secondaryBtn, marginBottom: 20}} onClick={() => setShowAuth(false)}>← Back to Dashboard</button>
+
+            <div style={S.authCard}>
+              <div style={S.authBrand}>
+                <div style={S.brandMark}><Zap size={18} color="#0F1B2E" /></div>
+                <div>
+                  <div style={{ ...S.brandName, fontSize: 19 }}>RescueRelief</div>
+                  <div style={S.brandSub}>Emergency Response Coordination</div>
+                </div>
+              </div>
+              <div style={S.authTabs}>
+                <button style={{ ...S.authTab, ...(mode === "login" ? S.authTabActive : {}) }} onClick={() => switchMode("login")}>Log in</button>
+                <button style={{ ...S.authTab, ...(mode === "signup" ? S.authTabActive : {}) }} onClick={() => switchMode("signup")}>Sign up</button>
+              </div>
+              {mode === "login" ? (
+                <form onSubmit={submitLogin} style={S.form}>
+                  <div id="google-signin-btn" style={{ marginBottom: 12 }}></div>
+                  <div style={{ textAlign: "center", fontSize: 11, color: "#8496AE", marginBottom: 12 }}>OR</div>
+                  <label style={S.label}>Username</label>
+                  <div style={S.inputIcon}><UserIcon size={14} /><input style={S.inputBare} value={username} onChange={e => setUsername(e.target.value)} required /></div>
+                  <label style={S.label}>Password</label>
+                  <div style={S.inputIcon}><Lock size={14} /><input style={S.inputBare} type="password" value={password} onChange={e => setPassword(e.target.value)} required /></div>
+                  {error && <div style={S.authError}>{error}</div>}
+                  <button type="submit" style={S.primaryBtn}>Log in</button>
+                </form>
+              ) : (
+                <form onSubmit={submitSignup} style={S.form}>
+                  <label style={S.label}>Full name</label>
+                  <input style={S.input} value={name} onChange={e => setName(e.target.value)} required />
+                  <label style={S.label}>Choose a username</label>
+                  <input style={S.input} value={username} onChange={e => setUsername(e.target.value)} required />
+                  <label style={S.label}>Choose a password</label>
+                  <input style={S.input} type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <label style={S.label}>Phone Number (for SMS)</label>
+                  <input style={S.input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="+1234567890" />
+                  <label style={S.label}>I am signing up as a</label>
+                  <select style={S.input} value={signupRole} onChange={e => setSignupRole(e.target.value)}>
+                    <option value="citizen">Citizen (report incidents, donate, get help)</option>
+                    <option value="volunteer">Volunteer (offer to help on the ground)</option>
+                  </select>
+                  {error && <div style={S.authError}>{error}</div>}
+                  <button type="submit" style={S.primaryBtn}><UserPlus size={15} /> Create account</button>
+                </form>
+              )}
+              <div style={S.authHint}>
+                <strong>Demo accounts</strong> (run <code>npm run seed</code> in backend first):
+                <div style={S.authHintRow}>admin / admin123 <span>Command Admin</span></div>
+                <div style={S.authHintRow}>alpha6 / team123 <span>Response — Alpha-6</span></div>
+              </div>
+            </div>
+          </div>
         ) : (
-          <form onSubmit={submitSignup} style={S.form}>
-            <label style={S.label}>Full name</label>
-            <input style={S.input} value={name} onChange={e => setName(e.target.value)} required />
-            <label style={S.label}>Choose a username</label>
-            <input style={S.input} value={username} onChange={e => setUsername(e.target.value)} required />
-            <label style={S.label}>Choose a password</label>
-            <input style={S.input} type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-            <label style={S.label}>Phone Number (for SMS)</label>
-            <input style={S.input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="+1234567890" />
-            <label style={S.label}>I am signing up as a</label>
-            <select style={S.input} value={signupRole} onChange={e => setSignupRole(e.target.value)}>
-              <option value="citizen">Citizen (report incidents, donate, get help)</option>
-              <option value="volunteer">Volunteer (offer to help on the ground)</option>
-            </select>
-            {error && <div style={S.authError}>{error}</div>}
-            <button type="submit" style={S.primaryBtn}><UserPlus size={15} /> Create account</button>
-          </form>
+          <div style={{ width: '100%', maxWidth: 1000, background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 16, padding: 36, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div>
+              <h2 style={{margin: 0, color: "var(--text-color, #E7ECF3)", fontSize: 28, fontFamily: "'Space Grotesk', sans-serif"}}>Live Public Dashboard</h2>
+              <p style={{margin: 0, color: "#8496AE", fontSize: 14, marginTop: 4}}>Monitor ongoing rescue operations and resource availability in real-time before you log in.</p>
+            </div>
+            
+            {stats && (
+              <div style={S.grid4}>
+                <div style={S.statCard}><div style={{...S.statIcon, background: "#D6454522", color: "#D64545"}}><AlertTriangle size={20}/></div><div><div style={S.statValue}>{stats.activeIncidents}</div><div style={S.statLabel}>Active Incidents</div></div></div>
+                <div style={S.statCard}><div style={{...S.statIcon, background: "#E8A23D22", color: "#E8A23D"}}><Truck size={20}/></div><div><div style={S.statValue}>{stats.teamsDeployed}</div><div style={S.statLabel}>Teams Deployed</div></div></div>
+                <div style={S.statCard}><div style={{...S.statIcon, background: "#3FA87322", color: "#3FA873"}}><Users size={20}/></div><div><div style={S.statValue}>{stats.totalVolunteers}</div><div style={S.statLabel}>Active Volunteers</div></div></div>
+                <div style={S.statCard}><div style={{...S.statIcon, background: "#D6486B22", color: "#D6486B"}}><Heart size={20}/></div><div><div style={S.statValue}>₹{stats.totalDonations.toLocaleString('en-IN')}</div><div style={S.statLabel}>Funds Raised</div></div></div>
+              </div>
+            )}
+
+            <div style={{ flex: 1, ...S.tickerBox, maxHeight: 400 }}>
+              <div style={S.tickerHead}><Activity size={14} /> LIVE DISPATCH UPDATES</div>
+              <div style={S.tickerList}>
+                {liveUpdates.length === 0 && <div style={S.tickerEmpty}>Waiting for live dispatch events...</div>}
+                {liveUpdates.map((l, i) => (
+                  <div key={i} style={{ ...S.tickerItem, borderLeftColor: toneColor(l.tone), color: "var(--text-color, #B7C1D1)" }}>
+                    <span style={S.tickerTime}>{l.time || new Date().toLocaleTimeString()}</span> {l.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
-        <div style={S.authHint}>
-          <strong>Demo accounts</strong> (run <code>npm run seed</code> in backend first):
-          <div style={S.authHintRow}>admin / admin123 <span>Command Admin</span></div>
-          <div style={S.authHintRow}>alpha6 / team123 <span>Response — Alpha-6</span></div>
-          <div style={{ fontSize: 11, color: "#5B7290", marginTop: 4 }}>(pattern repeats for bravo2, gamma9, delta3, echo1, fox5 — all team123)</div>
-        </div>
       </div>
     </div>
   );
 }
 
 /* ---------------- Shared bits ---------------- */
-
-function toneColor(tone) { return { critical: "#D64545", warn: "#E8A23D", success: "#3FA873", info: "#5B7290" }[tone] || "#5B7290"; }
 
 function SeverityBadge({ level }) {
   const map = { CRITICAL: { bg: "#3A1518", fg: "#FF7A7A" }, HIGH: { bg: "#3A2A12", fg: "#F0AE55" }, MEDIUM: { bg: "#123A2C", fg: "#5CD6A0" } };
@@ -1144,7 +1227,7 @@ function Table({ cols, rows }) {
 /* ---------------- Styles ---------------- */
 
 const S = {
-  app: { minHeight: "100vh", background: "#0B1420", color: "#E7ECF3", fontFamily: "Inter, system-ui, sans-serif", display: "flex", flexDirection: "column" },
+  app: { minHeight: "100vh", background: "#0B1420", color: "var(--text-color, #E7ECF3)", fontFamily: "Inter, system-ui, sans-serif", display: "flex", flexDirection: "column" },
   topbar: { display: "flex", alignItems: "center", gap: 16, padding: "12px 20px", borderBottom: "1px solid #1D2A3D", background: "#0F1B2E", flexWrap: "wrap" },
   brand: { display: "flex", alignItems: "center", gap: 10 },
   brandMark: { width: 30, height: 30, borderRadius: 8, background: "#3FA873", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
@@ -1179,36 +1262,36 @@ const S = {
   grid3: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12 },
   statCard: { display: "flex", alignItems: "center", gap: 12, background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 12, padding: 14 },
   statIcon: { width: 38, height: 38, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  statValue: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 21, fontWeight: 700, lineHeight: 1 },
-  statLabel: { fontSize: 11.5, color: "#8496AE", marginTop: 3 },
+  statValue: { fontFamily: "'Space Grotesk', sans-serif", fontSize: 21, fontWeight: 700, lineHeight: 1, color: "var(--text-color, inherit)" },
+  statLabel: { fontSize: 11.5, color: "var(--text-color, #8496AE)", marginTop: 3 },
   actionRow: { display: "flex", gap: 12, flexWrap: "wrap" },
   bigAction: { display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", borderRadius: 12, border: "none", color: "#0B1420", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" },
   card: { background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 6 },
-  cardTitleRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
-  cardMeta: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#8496AE" },
-  cardDesc: { fontSize: 12.5, color: "#B7C1D1", marginTop: 4 },
+  cardTitleRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--text-color, inherit)" },
+  cardMeta: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text-color, #8496AE)" },
+  cardDesc: { fontSize: 12.5, color: "var(--text-color, #B7C1D1)", marginTop: 4 },
   barTrack: { height: 7, background: "#1D2A3D", borderRadius: 4, overflow: "hidden", flex: 1 },
   barFill: { height: "100%", borderRadius: 4, transition: "width 0.5s" },
-  barLabel: { fontSize: 11, color: "#8496AE", marginTop: 4 },
+  barLabel: { fontSize: 11, color: "var(--text-color, #8496AE)", marginTop: 4 },
   form: { display: "flex", flexDirection: "column", gap: 8, maxWidth: 460 },
   formRow: { display: "flex", gap: 10 },
-  label: { fontSize: 12, color: "#8496AE", marginTop: 6 },
-  input: { background: "#0D1826", border: "1px solid #22314A", borderRadius: 8, padding: "10px 12px", color: "#E7ECF3", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
-  inputIcon: { display: "flex", alignItems: "center", gap: 8, background: "#0D1826", border: "1px solid #22314A", borderRadius: 8, padding: "10px 12px", color: "#8496AE" },
-  inputBare: { background: "transparent", border: "none", outline: "none", color: "#E7ECF3", fontSize: 13.5, fontFamily: "inherit", flex: 1 },
-  ruleHint: { display: "flex", alignItems: "center", gap: 10, background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, color: "#B7C1D1" },
-  primaryBtn: { display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", marginTop: 10, background: "#3FA873", color: "#0B1420", border: "none", borderRadius: 9, padding: "11px 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" },
-  secondaryBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid #2C3E5C", color: "#B7C1D1", borderRadius: 7, padding: "6px 11px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" },
+  label: { fontSize: 12, color: "var(--text-color, #8496AE)", marginTop: 6 },
+  input: { background: "#0D1826", border: "1px solid #22314A", borderRadius: 8, padding: "10px 12px", color: "var(--text-color, #E7ECF3)", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
+  inputIcon: { display: "flex", alignItems: "center", gap: 8, background: "#0D1826", border: "1px solid #22314A", borderRadius: 8, padding: "10px 12px", color: "var(--text-color, #8496AE)" },
+  inputBare: { background: "transparent", border: "none", outline: "none", color: "var(--text-color, #E7ECF3)", fontSize: 13.5, fontFamily: "inherit", flex: 1 },
+  ruleHint: { display: "flex", alignItems: "center", gap: 10, background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, color: "var(--text-color, #B7C1D1)" },
+  primaryBtn: { display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", marginTop: 10, background: "var(--btn-color, #3FA873)", color: "#0B1420", border: "none", borderRadius: 9, padding: "11px 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" },
+  secondaryBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid #2C3E5C", color: "var(--text-color, #B7C1D1)", borderRadius: 7, padding: "6px 11px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" },
   pillBtn: { background: "none", border: "none", cursor: "pointer", padding: 0 },
   confirmBox: { display: "flex", alignItems: "flex-start", gap: 12, background: "#0F241C", border: "1px solid #1F4A38", borderRadius: 10, padding: 14, marginTop: 10, maxWidth: 500 },
   badge: { padding: "3px 8px", borderRadius: 5, fontSize: 10.5, fontWeight: 700, letterSpacing: 0.3 },
   pill: { border: "1px solid", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 },
-  emptyState: { color: "#5B7290", fontSize: 13, background: "#111E30", border: "1px dashed #22314A", borderRadius: 10, padding: 18, lineHeight: 1.5 },
+  emptyState: { color: "var(--text-color, #5B7290)", fontSize: 13, background: "#111E30", border: "1px dashed #22314A", borderRadius: 10, padding: 18, lineHeight: 1.5 },
   tableWrap: { overflowX: "auto", border: "1px solid #1D2A3D", borderRadius: 12 },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
-  th: { textAlign: "left", padding: "10px 14px", background: "#111E30", color: "#8496AE", fontWeight: 600, fontSize: 11.5, letterSpacing: 0.3, borderBottom: "1px solid #1D2A3D" },
+  th: { textAlign: "left", padding: "10px 14px", background: "#111E30", color: "var(--text-color, #8496AE)", fontWeight: 600, fontSize: 11.5, letterSpacing: 0.3, borderBottom: "1px solid #1D2A3D" },
   tr: { borderBottom: "1px solid #17233559" },
-  td: { padding: "10px 14px", color: "#D6DEE9" },
+  td: { padding: "10px 14px", color: "var(--text-color, #D6DEE9)" },
   incidentRow: { display: "flex", gap: 14, background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 12, padding: 14 },
   idTag: { fontSize: 10.5, color: "#5B7290", fontFamily: "monospace" },
   missionCard: { background: "#111E30", border: "1px solid #1D2A3D", borderRadius: 12, padding: 16 },

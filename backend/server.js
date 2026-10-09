@@ -16,6 +16,12 @@ import complaintRoutes from "./routes/complaints.js";
 import donationRoutes from "./routes/donations.js";
 import chatbotRoutes from "./routes/chatbot.js";
 
+import Incident from "./models/Incident.js";
+import Team from "./models/Team.js";
+import Shelter from "./models/Shelter.js";
+import Volunteer from "./models/Volunteer.js";
+import Donation from "./models/Donation.js";
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -27,6 +33,51 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const nodemailer = (await import("nodemailer")).default;
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER,
+      subject: "Test Email from RescueRelief",
+      text: "If you are reading this, Nodemailer is working perfectly!"
+    });
+    res.json({ success: true, message: "Email sent successfully to " + process.env.EMAIL_USER });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/public/stats", async (req, res) => {
+  try {
+    const activeIncidents = await Incident.countDocuments({ status: { $ne: "COMPLETED" } });
+    const teamsDeployed = await Team.countDocuments({ status: { $ne: "Available" } });
+    const shelters = await Shelter.find();
+    let totalCapacity = 0;
+    let totalOccupancy = 0;
+    shelters.forEach(s => { totalCapacity += s.capacity; totalOccupancy += s.occupancy; });
+    const volunteers = await Volunteer.countDocuments();
+    const donations = await Donation.find();
+    let totalDonations = 0;
+    donations.forEach(d => { if (d.kind === "funds") totalDonations += d.amount; });
+    
+    res.json({ 
+      activeIncidents, 
+      teamsDeployed, 
+      availableShelterSpace: totalCapacity - totalOccupancy,
+      totalVolunteers: volunteers,
+      totalDonations
+    });
+  } catch (err) { res.status(500).json({ error: "Failed to fetch stats" }); }
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/incidents", incidentRoutes);
