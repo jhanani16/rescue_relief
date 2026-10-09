@@ -36,6 +36,13 @@ async function run() {
     MissingPerson.deleteMany({}),
   ]);
 
+  try {
+    await mongoose.connection.collection('users').dropIndex('email_1');
+    console.log("Dropped legacy email index");
+  } catch (e) {
+    // Ignore if index doesn't exist
+  }
+
   const adminHash = await bcrypt.hash("admin123", 10);
   await User.create({ username: "admin", password: adminHash, name: "Command Admin", role: "admin", notifications: [] });
 
