@@ -8,6 +8,7 @@ const NotificationSchema = new mongoose.Schema({
 
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  email: { type: String }, // Added to bypass legacy DB constraints
   password: { type: String, required: true }, // bcrypt hash
   name: { type: String, required: true },
   role: { type: String, enum: ["citizen", "volunteer", "response", "admin"], required: true },

@@ -44,14 +44,14 @@ async function run() {
   }
 
   const adminHash = await bcrypt.hash("admin123", 10);
-  await User.create({ username: "admin", password: adminHash, name: "Command Admin", role: "admin", notifications: [] });
+  await User.create({ username: "admin", email: "admin@rescue.local", password: adminHash, name: "Command Admin", role: "admin", notifications: [] });
 
   const teamHash = await bcrypt.hash("team123", 10);
   for (const t of TEAM_SEED) {
     await Team.create(t);
     const username = t.teamId.split("-")[0].toLowerCase() + t.teamId.split("-")[1];
     await User.create({
-      username, password: teamHash, name: `${t.name} Team Lead`, role: "response", teamId: t.teamId, notifications: [],
+      username, email: `${username}@rescue.local`, password: teamHash, name: `${t.name} Team Lead`, role: "response", teamId: t.teamId, notifications: [],
     });
     console.log(`  response login: ${username} / team123  ->  ${t.teamId}`);
   }
