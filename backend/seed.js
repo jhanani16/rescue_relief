@@ -37,10 +37,10 @@ async function run() {
   ]);
 
   try {
-    await mongoose.connection.collection('users').dropIndex('email_1');
-    console.log("Dropped legacy email index");
+    await mongoose.connection.collection('users').drop();
+    console.log("Dropped entire users collection to wipe old indexes");
   } catch (e) {
-    // Ignore if index doesn't exist
+    console.log("Collection drop skipped:", e.message);
   }
 
   const adminHash = await bcrypt.hash("admin123", 10);
