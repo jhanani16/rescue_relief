@@ -455,7 +455,7 @@ function LandingPage({ onLogin, onSignup, error, clearError }) {
   useEffect(() => {
     if (showAuth && mode === "login" && window.google) {
       window.google.accounts.id.initialize({
-        client_id: "336658980922-tlhiqp8i93fvkshjqbn3evipsafhapoe.apps.googleusercontent.com",
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
         callback: async (response) => {
           try {
             const res = await api.post("/auth/google", { token: response.credential });
