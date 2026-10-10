@@ -99,7 +99,9 @@ router.post("/:id/advance", requireAuth, requireRole("response", "admin"), async
     const nodemailer = (await import("nodemailer")).default;
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS && incident.assignedTeam) {
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
       });
       await transporter.sendMail({
