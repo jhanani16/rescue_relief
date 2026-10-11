@@ -48,21 +48,12 @@ router.post("/", requireAuth, requireRole("citizen", "admin"), async (req, res) 
       io.emit("team:updated", team);
 
       try {
-        const nodemailer = (await import("nodemailer")).default;
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-          const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-          });
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: "24104019@nec.edu.in",
-            subject: "RescueRelief Alert: Team Assigned",
-            text: `Admin Alert:\n\n${team.name} (${team.spec}) has been assigned and deployed to ${type} at ${location}.\nETA: ${eta} minutes.`
-          });
-        }
+        const { sendEmail } = await import("../mailer.js");
+        await sendEmail({
+          to: "24104019@nec.edu.in",
+          subject: "RescueRelief Alert: Team Assigned",
+          text: `Admin Alert:\n\n${team.name} (${team.spec}) has been assigned and deployed to ${type} at ${location}.\nETA: ${eta} minutes.`
+        });
       } catch (err) { console.error("Email failed:", err); }
 
       io.emit("team:updated", team);
@@ -96,16 +87,9 @@ router.post("/:id/advance", requireAuth, requireRole("response", "admin"), async
   io.emit("incident:updated", incident);
 
   try {
-    const nodemailer = (await import("nodemailer")).default;
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && incident.assignedTeam) {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-      });
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
+    if (incident.assignedTeam) {
+      const { sendEmail } = await import("../mailer.js");
+      await sendEmail({
         to: "24104019@nec.edu.in",
         subject: `RescueRelief Alert: Operation Update`,
         text: `Admin Alert:\n\nIncident ${incident._id} (${incident.type} at ${incident.location}) status has been updated to: ${incident.status} by Team ${incident.assignedTeam}.`

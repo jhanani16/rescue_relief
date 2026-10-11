@@ -36,21 +36,13 @@ app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 app.get("/api/test-email", async (req, res) => {
   try {
-    const nodemailer = (await import("nodemailer")).default;
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    });
-    await transporter.verify();
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
+    const { sendEmail } = await import("./mailer.js");
+    const result = await sendEmail({
+      to: req.query.to || process.env.EMAIL_USER || "24104019@nec.edu.in",
       subject: "Test Email from RescueRelief",
-      text: "If you are reading this, Nodemailer is working perfectly!"
+      text: "If you are reading this, RescueRelief email system is working perfectly!"
     });
-    res.json({ success: true, message: "Email sent successfully to " + process.env.EMAIL_USER });
+    res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

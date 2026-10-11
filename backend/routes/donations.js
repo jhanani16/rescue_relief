@@ -37,20 +37,16 @@ router.post("/", requireAuth, requireRole("citizen"), async (req, res) => {
       });
     }
 
-    // Simulate Email if credentials exist
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-      });
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: req.user.username, // Assuming username is email
+    // Send Email notification
+    try {
+      const { sendEmail } = await import("../mailer.js");
+      await sendEmail({
+        to: req.user.email || req.user.username || "24104019@nec.edu.in",
         subject: "RescueRelief Donation Confirmation",
         text: `Dear ${req.user.name},\n\nWe received your donation of ${label}. Thank you for helping us make a difference.`
       });
+    } catch (e) {
+      console.error("Donation email failed:", e.message);
     }
   } catch (err) {
     console.error("Failed to send external notifications:", err);
